@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright
 import os
-path='file:///mnt/data/manager_v062/manager.html'
+from pathlib import Path
+path=(Path(__file__).resolve().parent.parent/'manager.html').as_uri()
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True, executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage','--no-first-run'])
     page=browser.new_page(viewport={'width':1280,'height':800},color_scheme='dark')

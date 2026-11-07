@@ -1,6 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert').strict,crypto=require('crypto');
-const source=fs.readFileSync('/mnt/data/manager_v064/js/batch.js','utf8');
-const id='6aee198e-49e4-83ed-8db8-8cbe3427cec7';
+const path=require('path');
+const source=fs.readFileSync(path.join(__dirname,'..','js','batch.js'),'utf8');
+const id='11111111-2222-4333-8444-555555555555';
 const other='11111111-1111-1111-1111-111111111111';
 const account='test-account';
 const fingerprint=crypto.createHash('sha256').update(account).digest('hex');
@@ -10,7 +11,7 @@ function env(config={}){
  const main={innerText:'Conversación abierta con mensajes',textContent:'Conversación abierta con mensajes'};
  let seenPatch=false;
  const doc={querySelector:(s)=>/main/.test(s)?main:null};
- const get=()=>({conversation_id:config.remoteId||id,title:'Título cambiado por Normi',is_visible:seenPatch?false:true});
+ const get=()=>({conversation_id:config.remoteId||id,title:'Título cambiado por ejemplo',is_visible:seenPatch?false:true});
  const fetch=async(url,opt={})=>{
   calls.push({url,method:opt.method||'GET'});
   if(url==='/api/auth/session')return {ok:true,json:async()=>({accessToken:'secret-test',user:{id:config.account||account}})};

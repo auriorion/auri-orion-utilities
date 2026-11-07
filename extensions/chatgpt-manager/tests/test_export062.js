@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');
 const {webcrypto}=require('node:crypto');
 const root=path.resolve(__dirname,'..');
-const id='6aee198e-49e4-83ed-8db8-8cbe3427cec7';
+const id='11111111-2222-4333-8444-555555555555';
 function response(body,status=200){return {ok:status>=200&&status<300,status,json:async()=>body};}
 const session={accessToken:'TEST-PRIVATE-NEVER-SAVE',user:{id:'user-example'}};
 const mapping={

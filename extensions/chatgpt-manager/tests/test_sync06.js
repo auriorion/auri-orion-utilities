@@ -1,14 +1,14 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const {webcrypto}=require('node:crypto');
-const first='6aeedeb1-6534-83eb-b3db-2ec3d0d27573',second='6aee198e-49e4-83ed-8db8-8cbe3427cec7';
+const first='22222222-3333-4444-8555-666666666666',second='11111111-2222-4333-8444-555555555555';
 const seen=[];
 const fakeFetch=async(url,init)=>{
  seen.push({url,init});
  if(url==='/api/auth/session')return {ok:true,json:async()=>({user:{id:'account-1'},accessToken:'secret-never-expose'})};
  if(url.includes('offset=0'))return {ok:true,json:async()=>({items:[
    {id:first,title:'Auditoría de Orion',create_time:1791000000,update_time:1792000000,irrelevant:'DO-NOT-RETURN'},
-   {id:second,title:'Receta de Normi',create_time:1791000001,update_time:null}
+   {id:second,title:'Receta de ejemplo',create_time:1791000001,update_time:null}
  ]})};
  return {ok:true,json:async()=>({items:[]})};
 };

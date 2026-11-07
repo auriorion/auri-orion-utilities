@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Auri–Orion ChatGPT Manager",
   "version": "0.6.7",
-  "description": "Gestor de ChatGPT con explorador local con inventario ampliado, busqueda asistida, lectura por lotes y eliminacion seleccionada con confirmacion.",
+  "description": "Organiza, busca, exporta y elimina conversaciones de ChatGPT con confirmación desde un gestor local.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

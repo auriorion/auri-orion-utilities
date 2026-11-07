@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');
 const root=path.resolve(__dirname,'..');
-const id='6aeedeb1-6534-83eb-b3db-2ec3d0d27573';
+const id='22222222-3333-4444-8555-666666666666';
 const a={getAttribute(name){return name==='href'?'/c/'+id:null},innerText:'Mejoras y activaciones de Alma',textContent:'Mejoras y activaciones de Alma',parentElement:null};
 let clicked=false;
 const ctx={console,document:{title:'ChatGPT',querySelector(q){return q.includes('main')?{innerText:'Chat de prueba cargado'}:null},querySelectorAll(q){if(q==='a[href]')return[a];return []}},location:{origin:'https://chatgpt.com',pathname:'/c/'+id},URL,Date,Blob,TextEncoder,Uint32Array,Uint8Array};ctx.globalThis=ctx;vm.createContext(ctx);
@@ -13,7 +13,7 @@ const result=await B.onChatPage(id,{title:'Mejoras y activaciones de Alma',signa
 assert.equal(result.ok,true);assert.match(result.reason,/ID exacto/);
 const bad=await B.onChatPage(id,{title:'Chat equivocado',signature:null},'identity');
 assert.equal(bad.ok,true,'title rename must be accepted because ID matches');
-const wrong=await B.onChatPage('6aee198e-49e4-83ed-8db8-8cbe3427cec7',{title:'Mejoras y activaciones de Alma'},'identity');
+const wrong=await B.onChatPage('11111111-2222-4333-8444-555555555555',{title:'Mejoras y activaciones de Alma'},'identity');
 assert.equal(wrong.ok,false);assert.equal(wrong.stage,'url');
 const menu=await B.onChatPage(id,{title:'Mejoras y activaciones de Alma'},'locate');
 assert.equal(menu.ok,false);assert.equal(menu.stage,'menu');assert.equal(clicked,false);
