@@ -1,0 +1,30 @@
+{
+  "name": "auri-orion-mcp-browser",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Fork compatible de Browser Session MCP para Auri–Orion, con servidor local, extensión MV3 y puente nativo.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node mcp-server/index.js",
+    "server": "node mcp-server/index.js",
+    "doctor": "node mcp-server/index.js --doctor",
+    "test": "node mcp-server/tests/server.test.js && node mcp-server/tests/bridge.test.js && node mcp-server/tests/disconnect.test.js && node mcp-server/tests/connections.test.js && node mcp-server/tests/late-response.test.js && node mcp-server/tests/extension-transport.test.js && node --test mcp-server/tests/doctor.test.js mcp-server/tests/limits.test.js tools/tests/packaging.test.js && node --test tests/auri-compat.test.js",
+    "test:server": "node mcp-server/tests/server.test.js",
+    "test:bridge": "node mcp-server/tests/bridge.test.js",
+    "test:transport": "node mcp-server/tests/extension-transport.test.js",
+    "test:connections": "node mcp-server/tests/connections.test.js",
+    "test:late-response": "node mcp-server/tests/late-response.test.js",
+    "test:doctor": "node --test mcp-server/tests/doctor.test.js",
+    "test:limits": "node --test mcp-server/tests/limits.test.js",
+    "test:live": "node mcp-server/tests/live-smoke.js",
+    "install:host": "node native-messaging-host/install.js",
+    "install:native-host": "node native-messaging-host/install.js",
+    "package:store": "node tools/package-extension.js",
+    "package:source": "node tools/package-source.js",
+    "lint:firefox": "npx --yes web-ext lint --source-dir browser-extension"
+  },
+  "license": "MIT"
+}

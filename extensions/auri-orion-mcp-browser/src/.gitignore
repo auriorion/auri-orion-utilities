@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+
+# Machine-local MCP settings (may contain connection secrets)
+.zcode/
+
+# Generated screenshots
+screenshots/
+
+# Machine-local native messaging configuration
+native-messaging-host/chrome-extension-id.txt
+native-messaging-host/browser_session_mcp.chrome.json
+native-messaging-host/browser_session_mcp.firefox.json
+
+# Store packages built by tools/package-extension.js
+dist/

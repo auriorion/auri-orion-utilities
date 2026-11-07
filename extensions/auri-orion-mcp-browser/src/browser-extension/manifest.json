@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Auri–Orion MCP Browser",
+  "version": "0.5.0",
+  "description": "Conecta la sesión del navegador a agentes MCP autorizados mediante el servidor local Auri–Orion. Compatible con Browser Session MCP.",
+  "author": "Auri–Orion / Norale Milenio (fork MIT; ver LICENSE y documentación)",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "alarms",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' ws://127.0.0.1:*"
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "scripts": [
+      "service-worker.js"
+    ]
+  },
+  "action": {
+    "default_title": "Auri–Orion MCP Browser",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "auri-orion-mcp-browser@noralemilenio.local",
+      "strict_min_version": "128.0",
+      "data_collection_permissions": {
+        "required": [
+          "websiteContent",
+          "browsingActivity"
+        ]
+      }
+    }
+  },
+  "version_name": "0.5.0-auri.2"
+}

@@ -1,0 +1,177 @@
+# 架构说明
+
+## 1. 总体架构
+
+```
+AI agent
+   │  MCP over stdio（JSON-RPC 2.0）
+   ▼
+mcp-server/index.js                  MCP 服务器（零依赖，14 个工具）
+   │  ① native-messaging-host/bridge.js  原生消息通道（首选）
+   │  stdio 4 字节 LE 长度帧 ↔ WebSocket
+   │  ② ws://127.0.0.1:9777              WebSocket 回退（mcp-server/websocket.js，手写 RFC 6455）
+   ▼
+browser-extension/                   MV3 扩展（service worker 执行工具）
+   │  chrome.tabs / chrome.scripting.executeScript / captureVisibleTab
+   ▼
+当前浏览器会话
+```
+
+设计取舍：
+
+- 不使用 `chrome.debugger`：避免调试横幅与整页 CDP 接管，权限模型更简单。
+  代价是按键只能合成 `KeyboardEvent`，截图只能取可视区。
+- 无持久 content script：每次动作经 `chrome.scripting.executeScript` 注入自包含函数，
+  无状态、不污染页面。
+- `evaluate` 运行在页面 MAIN world，可访问页面自身全局变量；DOM 动作运行在隔离世界。
+- 截图由扩展回传 dataURL，服务器解码写入 `./screenshots/`，避免 base64 进入模型上下文。
+
+## 2. 扩展
+
+- `manifest.json`：MV3，权限 `tabs / scripting / storage / alarms / nativeMessaging`，
+  `host_permissions: <all_urls>`，显式声明 CSP
+  （`connect-src 'self' ws://127.0.0.1:*`，因为回退通道端口可在弹窗里配置）。
+- `service-worker.js`：
+  - 传输由单一状态机管理：`disabled | idle | connecting | online(native|websocket)`；
+  - 每次启动/重建都递增**世代号**，原生端口与 WebSocket 的回调都先校验世代号与对象身份，
+    迟到的 `onDisconnect` / `onclose` 不会影响新连接；
+  - 原生优先：连上原生宿主后先发 `configure`（端口）与 `hello`，2s 内未收到任何帧则**保留端口**
+    并先用 WebSocket；原生通道之后一旦回帧就晋升为主通道（关掉 WebSocket，世代号不变，
+    在途调用按 `replyToCaller` 改走原生通道）；宿主进程消失（`onDisconnect`）才真正回退；
+  - `chrome.alarms`（30s）做健康检查：只在当前通道上发 ping，超时则切换/重连，绝不并行开第二条通道；
+  - `snapshot` 枚举可交互元素（`a[href] / button / input / textarea / select / summary /
+    [role=…] / [onclick]`），生成稳定 CSS 选择器 `ref`（优先 `#id`，否则
+    `tag:nth-of-type` 路径，最深 4 层），`max` 在扩展侧钳制到 1–500；
+  - 截图：Firefox 用 `tabs.captureTab` 直接截指定标签页；Chromium 走
+    「读取上一个活动标签 → 激活目标 → 复核 → captureVisibleTab → 再复核」的互斥流程，
+    并发截图串行执行，任何一次核验失败都不返回图片（宁可报错也不截错页）；
+  - popup：连接状态（含通道名）、Connect / Disconnect、端口设置；版本号读自 manifest。
+- `nativeMessaging` 宿主名：`browser_session_mcp`；Firefox gecko ID：
+  `browser-session-mcp@ashu0729will.local`（`native-messaging-host/install.js` 会写入注册表并清理旧键）。
+
+## 3. 线上协议
+
+```
+server → extension : { id, tool, params }        执行请求
+extension → server : { id, ok: true, result }    成功
+                   | { id, ok: false, error }    失败
+状态帧             : { type: "hello" | "ping" | "pong" }
+控制帧（仅原生桥） : { type: "configure", port }  切换桥的下游端口，不下发服务器
+```
+
+原生消息通道使用同一套 JSON 负载，外层为浏览器规定的 `4 字节小端长度 + UTF-8 JSON` 帧。
+## 4. 工具（14 个）
+
+`navigate` `snapshot` `click` `type` `press_key` `evaluate` `read` `screenshot` `scroll`
+`tabs_list` `tab_select` `wait` `connection_status` `browser_select`
+
+`navigate` 默认立即返回，`waitForLoad: true` 时等待 load；`newTab: true` 时改为打开新标签页
+（记为 `origin: "agent"`，存于 `chrome.storage.session` 供 `tabs_list` 区分 agent 打开的
+与用户自己的标签页）。除 `tabs_list` / `tab_select` /
+`wait` 外的工具都接受 `tabId`。服务器声明严格 schema（`additionalProperties: false`），
+并在 `tools/list` 中如实列出全部参数：`navigate.waitForLoad`、`navigate.newTab`、`click.humanMode`、
+`click.force`、`type.humanMode`、`type.clear`、`screenshot.tabId`、`snapshot.max`、
+`evaluate.world`、`click`/`type`/`press_key`/`scroll` 的 `expectRevision`。
+
+`snapshot` 额外返回 `revision`——页面结构指纹（URL + 标题 + 可交互元素数 + 文本量的散列），
+与元素枚举同一次注入原子产生。把它作为 `expectRevision` 传给动作工具时，扩展先重取指纹，
+不匹配即以 `STALE_OBSERVATION` 拒绝执行（只消耗一次签名注入，动作本身不运行）。
+`click` / `type` / `press_key` / `scroll` / `navigate` 的结果带 `effect`
+（`navigation` / `dom_changed` / `input_dispatched` / `scrolled` / `no_visible_change` /
+`unknown`），由动作前后指纹对比得出；指纹不含滚动位置（ref 跨滚动仍有效），
+`scroll` 的效果由页面函数按滚动位移自报。
+
+`evaluate` 在页面 MAIN world 求值（`world: auto` 默认；被 CSP 拦时会改试扩展隔离世界并说明，
+`world: main` / `isolated` 可强制）。求值只能靠 `Function`，因此被 CSP 禁止 eval 的页面无法求值——
+这类页面上用 `read` 读取元素状态（文本 / 值 / 选中态 / 可见性 / 属性），它是固定注入、不需要 eval。
+被拦时 `evaluate` 会明确报错并指向这些替代路径，绝不把「没跑成」当成「结果是 null」
+（Chromium 会把被拦的注入解析成 `null`，扩展用哨兵包装识别）。
+文件上传未提供专用工具，可用 `evaluate` + `DataTransfer` 实现。
+
+### 4.1 事件保真度
+
+- `type` 在页面 MAIN world 执行 `document.execCommand("insertText")`，由浏览器编辑管线完成输入，
+  产出 `isTrusted === true` 的 `InputEvent`（`inputType: "insertText"`、带 `event.data`）。
+  页面拒绝时回退逐字符合成事件（`keydown → beforeinput → input → keyup`），
+  返回值 `via` 标明实际路径。
+- `click` 的 `force: true` 在同一帧内移除 `disabled` / `aria-disabled` 再点击，
+  用于越过纯客户端的确认门槛；服务端校验照旧生效。
+- `isTrusted` 是 DOM 规范的 `[LegacyUnforgeable]`，无法从 JS 伪造；
+  只认真实按键事件的页面需要 OS 级输入。
+- 回归实验页：`test-pages/event-trust.html`。
+
+### 4.2 开发循环
+
+Firefox 临时附加组件修改后无需点击「重载」：断开原生消息桥，等待事件页挂起
+（约 3 分钟；`chrome.alarms` 每 30s 会唤醒它），再次连接时 Firefox 会从磁盘重新读取扩展源码。
+可通过 hello 帧中的版本号验证是否生效。
+
+## 5. 传输与稳定性
+
+- 原生消息通道由浏览器托管桥进程，浏览器退出即随之结束，事件页挂起时仍可唤醒。
+- 桥的下游地址默认 `ws://127.0.0.1:9777`，可被 `BSM_WS_URL` 覆盖为初始值；
+  扩展的 `configure` 帧始终优先，因此弹窗端口对两条通道都生效。
+- WebSocket 通道仅监听 `127.0.0.1`；端口被占用时明确报错退出，不终止其他进程。
+- 防假死：应用层心跳 + 双向 ping/pong 往返 + 2.5 个周期无活动即清扫半开连接。
+- 浏览器断开后是否退出：仅当显式设置 `BSM_EXIT_ON_DISCONNECT` 时，才在 15s（`BSM_DISCONNECT_GRACE_MS`）宽限后自动退出并释放端口；默认保持服务器运行。
+- 环境变量：`BSM_PORT` `BSM_CONNECT_WAIT_MS` `BSM_KEEPALIVE_MS` `BSM_REQUEST_TIMEOUT_MS`
+  `BSM_DISCONNECT_GRACE_MS` `BSM_EXIT_ON_DISCONNECT` `BSM_QUIET` `BSM_DOCTOR_WAIT_MS`
+  `BSM_MAX_MESSAGE_BYTES`（旧 `BML_*` 名称仍被接受），
+  以及仅桥使用的 `BSM_WS_URL`。
+- 挂起感知重连：`chrome.tabs.onActivated` / `chrome.windows.onFocusChanged` 也会触发幂等的
+  `startTransport()`，把重连对齐到「真的在用浏览器」的那一刻，不依赖会随 MV3 worker 挂起丢失的 3s 定时器。
+- `--doctor` 自检：`node mcp-server/index.js --doctor` 逐项检查端口占用、原生宿主注册与 manifest、
+  扩展 ID 文件、以及等待窗口（`BSM_DOCTOR_WAIT_MS`，默认 3000ms）内是否有客户端连上，末行 `VERDICT:` 给结论；
+  服务器同时记录连接历史（是否连过、上次断开时间与原因），连接错误据此区分「从未连接」与「曾连接已断开」。
+- 输出帧上限：客户端对单条 MCP 消息有自己的上限，超过会被丢弃并使全部工具变成
+`unknown mcp tool`。因此每条输出消息都受 `BSM_MAX_MESSAGE_BYTES`（默认 1 MiB，最小 64 KiB）约束，
+下限刻意高于服务器自身最大的协议帧（`tools/list` 约 5.8 KB），以免上限反噬工具发现；超限的工具结果
+改以有界、可操作的 `RESULT_TOO_LARGE` 工具错误返回，服务器与工具注册保持存活。
+- 超时对账：工具请求超时（`BSM_REQUEST_TIMEOUT_MS`）后请求 id 保留（上限 64 条）；扩展的迟到
+应答记入 `connection_status.lateResponses`（上限 16 条），区分 `timed_out_late_success` /
+`timed_out_late_error`；连接断开时未决记录以 `timed_out_late_transport_closed` 收尾。
+条目均带 `nextAction`（`observe_reconcile` / `reconnect_or_retry`）。
+- 错误码约定：错误消息统一 `SCREAMING_CODE:` 前缀，供 agent 机器判别——服务器侧
+`RESPONSE_TIMEOUT` / `BROWSER_DISCONNECTED` / `CONNECTION_REPLACED` / `CLIENT_NOT_CONNECTED` /
+`RESULT_TOO_LARGE`，扩展侧 `INVALID_PARAMS` / `TAB_NOT_FOUND` / `NO_ACTIVE_TAB` /
+`INJECTION_FAILED` / `ELEMENT_NOT_FOUND` / `STALE_OBSERVATION` / `SCREENSHOT_FAILED` /
+`EVALUATE_*` / `ACTION_FAILED` / `UNKNOWN_TOOL`。
+
+## 6. 测试
+
+| 脚本 | 覆盖 |
+|------|------|
+| `mcp-server/tests/server.test.js` | 37 项：握手、工具枚举、严格 schema、工具调用、参数透传、截图落盘与命名 |
+| `mcp-server/tests/bridge.test.js` | 8 项：请求转发、响应回传、心跳往返、`configure` 端口切换与非法端口 |
+| `mcp-server/tests/disconnect.test.js` | 4 项：断开后宽限期释放端口 |
+| `mcp-server/tests/extension-transport.test.js` | 107 项：在 `node:vm` 里跑真实 service worker，覆盖原生失败即时回退、握手超时后的原生晋升、双通道互斥、断开持久化、冷启动、旧回调隔离、端口校验、`tabs.onActivated` / `windows.onFocusChanged` 唤醒重连、观测 revision 与 `expectRevision` 过期拒绝、动作 `effect` 分类、`newTab` 来源标记，以及品牌/CSP/版本一致性 |
+| `mcp-server/tests/late-response.test.js` | 7 项：`RESPONSE_TIMEOUT` 后请求 id 保留、迟到成功/失败应答分别记入 `connection_status.lateResponses` 并带 `nextAction` 对账提示 |
+| `mcp-server/tests/live-smoke.js` | 21 项真机冒烟（非离线）：自起本地测试页，驱动真实浏览器并断言页面确实变化（点击计数、受信任 `InputEvent`、跨 iframe、滚动、截图尺寸） |
+| `mcp-server/tests/connections.test.js` | 1 项（`node:test`）：离线诊断、多客户端选择、来源绑定、替换与恢复 |
+| `mcp-server/tests/doctor.test.js` | 3 项（`node --test`）：`--doctor` 无客户端、扩展 hello 后判定已连接、仅裸连接不误判为扩展，并断言探测始终在时限内结束 |
+| `tools/tests/packaging.test.js` | 7 项（`node --test`）：商店包与源码包内容、排除规则、重建确定性、换行无关性、ZIP CRC/解压校验 |
+| `mcp-server/tests/limits.test.js` | 3 项（`node --test`）：超限结果转为 `RESULT_TOO_LARGE` 工具错误且保留请求 id、按 UTF-8 字节而非字符计量、没有任何一帧超过上限、随后普通调用仍成功，以及最小上限下 `tools/list` 仍完整、默认上限不影响正常结果 |
+
+真机测试：`e2e-firefox.js`、`real-click-test.js`、`real-trust-test.js`、`demo-cursor.js`。
+
+## 7. 已知约束
+
+- 合成事件对少数框架页面无效；升级路线为可选的真实输入模式。
+- `nth-of-type` 选择器在 DOM 动态变化后可能失效。
+- Chromium 上截取非活动标签页会短暂激活它（这是浏览器 API 的限制，已尽量缩短并恢复）。
+- 商店审核对 `<all_urls>` 权限审查趋严，必要时拆分窄域权限。
+- Chromium 系原生通道需手填扩展 ID，缺省走 WebSocket。
+
+## 8. 里程碑
+
+- [x] v0.2.0 MCP 服务器 + 扩展 MVP、自有协议、自动化测试
+- [x] v0.2.1 跨浏览器兼容 + Firefox 端到端验证
+- [x] v0.3.0 虚拟光标；双向心跳；断开释放端口
+- [x] v0.3.1 原生消息通道作为首选传输
+- [x] v0.3.2 受信任输入；`click.force`；事件保真度实验页
+- [x] v0.3.3 改名 Browser Session MCP、目录规范化、双通道状态统一、schema 与文档对齐
+- [x] v0.4.0 安装/启动/连接诊断与恢复；客户端内 `connection_status` / `browser_select`；挂起感知重连；发布一致性
+- [x] v0.4.1 输出帧上限 `BSM_MAX_MESSAGE_BYTES`：超限结果返回可操作错误而不中断连接
+- [x] v0.5.0 观测修订号与 `expectRevision`；动作 `effect` 分类；标签页 `origin` 与 `navigate.newTab`；迟到响应对账；错误码前缀；弹窗「复制 Agent 指南」
+- [ ] 真实按键路径（可选 debugger 后端）
+- [ ] 商店发布

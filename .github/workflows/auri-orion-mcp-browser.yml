@@ -1,0 +1,35 @@
+name: Auri–Orion MCP Browser · paridad
+on:
+  push:
+    branches: [main]
+    paths:
+      - "extensions/auri-orion-mcp-browser/**"
+      - ".github/workflows/auri-orion-mcp-browser.yml"
+  pull_request:
+    paths:
+      - "extensions/auri-orion-mcp-browser/**"
+      - ".github/workflows/auri-orion-mcp-browser.yml"
+permissions:
+  contents: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extensions/auri-orion-mcp-browser/src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test suite original + Auri
+        run: npm test
+      - name: Pack Chrome
+        run: npm run package:store
+      - name: Pack source
+        run: npm run package:source
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auri-orion-mcp-browser-paquetes
+          path: extensions/auri-orion-mcp-browser/src/dist/*.zip
+          if-no-files-found: error
