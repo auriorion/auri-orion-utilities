@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert').strict;
+const root=__dirname+'/..', ctx={globalThis:{}};vm.createContext(ctx);vm.runInContext(fs.readFileSync(root+'/js/batch.js','utf8'),ctx);
+const B=ctx.globalThis.AOMBatch;
+assert.equal(B.preferredMethod('f'.repeat(64)),'session');
+assert.equal(B.preferredMethod(null),'visual');
+const app=fs.readFileSync(root+'/js/app.js','utf8'),html=fs.readFileSync(root+'/manager.html','utf8');
+assert(app.includes("B.preferredMethod(localStorage.getItem('aom.accountFingerprint'))"));
+assert(app.includes("if(!useSession){"));
+assert(app.includes("if(!isSession){"));
+assert(app.includes("remote-session-ack').checked=false"));
+assert(html.includes('remote-preflight-result'));
+console.log('PASS: ID default, separate opt-in, no DOM requirement for session');

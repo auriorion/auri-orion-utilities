@@ -1,0 +1,48 @@
+name: Auri–Orion ChatGPT Manager · QA
+on:
+  push:
+    branches: [main]
+    paths:
+      - "extensions/chatgpt-manager/**"
+      - ".github/workflows/auri-orion-chatgpt-manager.yml"
+  pull_request:
+    paths:
+      - "extensions/chatgpt-manager/**"
+      - ".github/workflows/auri-orion-chatgpt-manager.yml"
+permissions:
+  contents: read
+jobs:
+  test-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: JS static checks and unit suite
+        run: |
+          set -euo pipefail
+          cd extensions/chatgpt-manager
+          for f in background.js js/*.js; do node --check "$f"; done
+          for t in tests/test_*.js; do echo "::group::$t"; node "$t"; echo "::endgroup::"; done
+      - name: Package store ZIP and reviewed sources
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          root=Path("extensions/chatgpt-manager")
+          dist=Path("dist")
+          dist.mkdir(exist_ok=True)
+          runtime=[root/"manifest.json",root/"background.js",root/"manager.html",root/"styles.css",*sorted((root/"js").glob("*.js")),*sorted((root/"icons").glob("*.png"))]
+          assert all(p.is_file() for p in runtime)
+          with ZipFile(dist/"auri-orion-chatgpt-manager-v0.6.7-chrome.zip","w",ZIP_DEFLATED) as z:
+              for p in runtime:z.write(p,p.relative_to(root))
+          with ZipFile(dist/"auri-orion-chatgpt-manager-v0.6.7-source.zip","w",ZIP_DEFLATED) as z:
+              for p in sorted(root.rglob("*")):
+                  if p.is_file():z.write(p,p.relative_to(root.parent))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: auri-orion-chatgpt-manager-v0.6.7
+          path: dist/*.zip
+          if-no-files-found: error

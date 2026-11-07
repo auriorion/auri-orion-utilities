@@ -16,6 +16,18 @@ Extensión Chrome/Edge basada en [Browser Session MCP](https://github.com/ashu07
 
 **Estado:** fuentes distribuidas públicamente, pruebas automatizadas y conexión WebSocket verificadas previamente; la aprobación en Chrome Web Store y la validación integral de las herramientas MCP **no están certificadas aquí**.
 
+## Auri–Orion ChatGPT Manager
+
+Extensión Chrome **v0.6.7** para organizar conversaciones de ChatGPT: inventario local, carpetas y subcarpetas, búsqueda, lectura, exportación Markdown/HTML/JSON/ZIP y borrado remoto seleccionado con confirmación. **Las conversaciones eliminadas remotamente se ocultan de los listados y contadores; las copias locales de mensajes pueden permanecer almacenadas.**
+
+- [Código fuente y guía de uso](extensions/chatgpt-manager/)
+- [Extensión cargable en Chrome](extensions/chatgpt-manager/manifest.json)
+- [Política de privacidad actualizada v0.6.7](extensions/chatgpt-manager/docs/PRIVACY.md)
+- [Seguridad y limitaciones](extensions/chatgpt-manager/docs/SECURITY.md)
+- [Ficha y requisitos de Chrome Web Store](extensions/chatgpt-manager/docs/CHROME_WEB_STORE.md)
+
+La extensión trabaja sobre la sesión autenticada de ChatGPT y utiliza algunas rutas web internas no documentadas, cuya compatibilidad puede cambiar; no es una herramienta oficial de OpenAI. Las funciones destructivas requieren confirmación y pueden ser irreversibles. **La publicación en GitHub no equivale a aprobación por Chrome Web Store.**
+
 ## Alcance
 
 Este repositorio **no es un espejo del desarrollo interno**. Se publican solo componentes auditados. No incluir credenciales, datos de sesiones, información corporativa, referencias privadas o archivos de terceros cuya redistribución no esté autorizada.

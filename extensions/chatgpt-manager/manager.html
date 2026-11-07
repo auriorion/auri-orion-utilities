@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><title>Auri–Orion · ChatGPT Manager</title>
+<link rel="stylesheet" href="styles.css"></head><body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand-mark">A<span>O</span></div>
+    <div class="brand-copy"><strong>ChatGPT Manager</strong><small>Auri–Orion Utilities · Gestor de ChatGPT v0.6.7</small></div>
+    <div class="header-meta"><span class="dot"></span> Solo en este navegador <span class="header-sep">·</span> Sin servidor propio</div>
+    <button class="btn primary" id="sync-history" title="Sincronización opcional de solo lectura; usa rutas internas no documentadas de ChatGPT">⇄ Sincronizar cuenta</button>
+    <button class="btn subtle" id="stop-sync" hidden>Detener sincronización</button>
+    <button class="btn subtle" id="live-scan">◎ Leer visibles</button>
+    <button class="btn subtle" id="live-deep" title="Recorre la barra lateral cargada, sin APIs internas">↧ Explorar historial lateral</button>
+    <button class="btn subtle" id="live-search" title="Leer los resultados de una búsqueda abierta en ChatGPT">⌕ Leer búsqueda</button>
+    <button class="btn subtle" id="copy-search-diagnostic" title="Copiar solo la estructura del buscador, sin nombres ni mensajes" hidden>▤ Copiar diagnóstico</button>
+    <button class="btn subtle" id="open-import">⬆ Importar JSON</button>
+    <button class="btn subtle" id="capture">◎ Capturar chat abierto</button>
+    <button class="btn primary" id="backup">↓ Exportar selección</button>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="side-title">EXPLORADOR</div>
+      <nav id="folders" aria-label="Carpetas"></nav>
+      <div class="sidebar-divider"></div>
+      <div class="side-title side-between">MIS CARPETAS <button id="new-folder" class="icon-btn" title="Nueva carpeta">＋</button></div>
+      <nav id="custom-folders" aria-label="Mis carpetas"></nav>
+      <div id="folder-context-menu" class="folder-context-menu" role="menu" hidden></div>
+      <div class="sidebar-bottom"><strong>Privacidad primero</strong><p>Todos los chats pueden organizarse. Borrarlos del catálogo local NO los elimina de ChatGPT.</p></div>
+    </aside>
+    <main class="main">
+      <div class="breadcrumb"><span>Mis conversaciones</span><span class="chevron">›</span><strong id="folder-title">Todos mis chats</strong></div>
+      <div class="page-header"><div><h1 id="page-title">Todos mis chats</h1><p id="page-subtitle">Chats conocidos por el gestor, incluidos los sincronizados desde la cuenta; cobertura no garantizada</p></div><div class="stats"><strong id="total-count">0</strong><span>conversaciones</span></div></div>
+      <div class="toolbar">
+        <label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="Buscar por título o contenido..." autocomplete="off" aria-label="Buscar chats"></label>
+        <select id="age" aria-label="Antigüedad mínima"><option value="0" selected>Cualquier fecha</option><option value="15">Más de 15 días</option><option value="30">Más de 30 días</option><option value="60">Más de 60 días</option></select>
+        <select id="search-mode" aria-label="Buscar en"><option value="title">Solo títulos</option><option value="content">Títulos y contenido</option></select>
+        <button class="btn subtle" id="filters-toggle">⚙ Filtros</button>
+      </div>
+      <section id="filters" class="filters" hidden>
+        <div class="field"><label for="include">Palabras para incluir (separadas por comas)</label><textarea id="include" rows="2">Auri, Orion, Orión, Alma, OrionHub, Vault, Athena, Mem0, Tool Studio</textarea></div>
+        <div class="field"><label for="exclude">Palabras para clasificar como «Otros temas»</label><textarea id="exclude" rows="2">recetas, cocina, oración, salud, Elu</textarea></div>
+        <div class="field inline"><label for="match">Coincidencias</label><select id="match"><option value="any">Cualquiera</option><option value="all">Todas</option></select></div>
+        <button class="btn primary" id="apply-filters">Aplicar filtros</button>
+        <p class="hint">Los filtros solo sirven para organizar y buscar. Ninguna conversación se bloquea por ser personal.</p>
+      </section>
+      <div class="actions"><label class="select-all"><input type="checkbox" id="select-visible"> Seleccionar página</label><span id="selected-count">0 seleccionados</span><button id="move" class="btn tiny" disabled>Mover a carpeta</button><button id="hydrate" class="btn tiny" disabled>◉ Leer contenido seleccionado</button><button id="hydrate-stop" class="btn tiny danger" hidden>Detener lectura</button><button id="remote-delete" class="btn tiny danger" disabled>🗑 Borrar lote en ChatGPT</button><button id="local-delete" class="btn tiny danger" disabled>Mover a papelera local</button><button id="restore" class="btn tiny" hidden>Restaurar</button><div class="flexfill"></div><span id="result-count" class="muted">0 resultados</span></div>
+      <div class="columns" role="table" aria-label="Conversaciones"><span></span><button data-sort="title">Nombre ▾</button><button data-sort="updatedAt">Modificado ▾</button><span>Mensajes</span><span>Origen</span><span></span></div>
+      <div id="chat-list" class="chat-list" role="rowgroup"></div>
+      <div class="list-footer"><span id="list-status">Pulsa «Leer visibles» o «Explorar historial lateral» para descubrir chats</span><button id="more" class="btn tiny" hidden>Mostrar más</button></div>
+    </main>
+    <aside id="viewer" class="viewer"><div class="viewer-empty"><div class="empty-icon">▤</div><strong>Vista previa</strong><p>Selecciona una conversación para leerla sin salir del explorador.</p></div></aside>
+  </div>
+  <footer class="statusbar"><span id="app-status">Preparado · Solo se conecta a ChatGPT cuando lo solicitas; sin servidores de terceros</span><span>Chrome · Almacenamiento local IndexedDB</span></footer>
+</div>
+<dialog id="import-dialog"><form method="dialog" class="dialog-body" id="import-form"><div class="dialog-head"><h2>Importar conversaciones</h2><button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button></div><p>Selecciona los archivos <code>conversations*.json</code> extraídos de tu exportación oficial de OpenAI, o JSON previamente guardados con esta herramienta.</p><label class="dropzone" id="dropzone"><span class="drop-icon">⇧</span><strong>Seleccionar o arrastrar archivos JSON</strong><small>No necesitas volver a solicitar una exportación a OpenAI.</small><input id="import-files" type="file" accept=".json,application/json" multiple hidden></label><label class="toggle"><input id="preserve-raw" type="checkbox"> Conservar también el JSON original de cada conversación (ocupa más espacio)</label><p class="hint">Se importan mensajes de texto y metadatos. Los adjuntos pueden quedar incompletos; nunca se considerarán respaldados automáticamente.</p><div id="import-progress" class="import-progress" hidden><div class="progress-track"><div id="progress-bar"></div></div><p id="progress-label">Preparando…</p></div><div class="dialog-actions"><button class="btn subtle" value="cancel" id="close-import">Cerrar</button><button type="button" class="btn primary" id="start-import" disabled>Importar archivos</button></div></form></dialog>
+<dialog id="backup-dialog"><form method="dialog" class="dialog-body"><div class="dialog-head"><h2>Exportación manual</h2><button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button></div><p id="backup-summary"></p><label class="field">Formato<select id="export-format"><option value="md">Markdown (.md)</option><option value="html">HTML (.html)</option><option value="json">JSON (.json)</option></select></label><label class="toggle"><input id="backup-auto-read" type="checkbox" checked> Leer desde ChatGPT el contenido de los chats seleccionados que todavía solo tienen metadatos.</label><label class="toggle"><input id="backup-metadata-only" type="checkbox"> Si la lectura falla, permitir exportar solo el índice (NO es una copia del chat).</label><p id="backup-progress" class="hint" role="status" aria-live="polite">Los chats sincronizados con 0 mensajes necesitan lectura previa para generar una copia textual. Los adjuntos no se descargan.</p><p class="hint">La lectura directa usa únicamente tu sesión de ChatGPT. Las conversaciones múltiples se exportan en un ZIP. No incluye los archivos adjuntos externos.</p><div class="dialog-actions"><button class="btn subtle" value="cancel">Cancelar</button><button type="button" id="confirm-backup" class="btn primary">Descargar</button></div></form></dialog>
+<dialog id="delete-dialog"><form method="dialog" class="dialog-body"><div class="dialog-head"><h2 id="delete-title">Mover a papelera local</h2><button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button></div><p id="delete-summary"></p><p class="danger-note">Esta operación solo modifica los datos guardados en este explorador. <strong>No borra los chats de tu cuenta de ChatGPT.</strong></p><div class="dialog-actions"><button class="btn subtle" value="cancel">Cancelar</button><button type="button" id="confirm-delete" class="btn danger-solid">Confirmar</button></div></form></dialog>
+<dialog id="remote-dialog"><div class="dialog-body remote-dialog"><div class="dialog-head"><h2>Eliminar lote real de ChatGPT</h2><button id="close-remote" class="icon-btn" aria-label="Cerrar">✕</button></div>
+<p class="danger-note"><strong>Atención:</strong> esta operación eliminará las conversaciones de tu cuenta de OpenAI, no solo de este catálogo. La eliminación no se puede deshacer. Puede incluir conversaciones personales o recientes si las has seleccionado. El método visual utiliza menús; el método de sesión utiliza una API web interna no documentada y requiere consentimiento separado.</p>
+<p id="remote-summary"></p><div id="remote-list" class="remote-list" aria-label="Conversaciones que se eliminarán"></div>
+<div id="remote-review">
+<label class="field remote-method-field">Método de eliminación
+<select id="remote-method" aria-label="Método de eliminación">
+<option value="session">Por ID y cuenta (validado)</option>
+<option value="visual">Menús de ChatGPT (alternativa visual)</option>
+</select></label>
+<div id="remote-session-notice" class="remote-session-notice" hidden>
+<p><strong>Borrado por ID y cuenta.</strong> Probado con éxito en tu cuenta.  No depende del menú lateral, del título ni de que ChatGPT muestre mensajes. Utiliza una ruta interna de ChatGPT no documentada. Antes de solicitar cada eliminación verifica la cuenta y el ID exacto (nunca depende del título); tras la solicitud comprueba el resultado. Puede dejar de funcionar si OpenAI cambia la web. No guarda tokens y no reintenta eliminaciones inciertas.</p>
+<label class="toggle"><input type="checkbox" id="remote-session-ack"> Acepto expresamente utilizar este método interno para el lote seleccionado.</label>
+</div>
+<label class="toggle"><input id="remote-ack" type="checkbox"> He revisado la lista exacta y entiendo que la eliminación es irreversible.</label>
+<label class="field">Para confirmar, escribe <strong id="remote-phrase-label"></strong><input id="remote-phrase" autocomplete="off" spellcheck="false" placeholder="BORRAR 3"></label>
+<p id="remote-preflight-result" class="hint" role="status" aria-live="polite" hidden></p><div class="dialog-actions"><button id="remote-test" class="btn subtle" type="button">Verificar primer chat (sin borrar)</button><button id="remote-start" class="btn danger-solid" disabled type="button">Eliminar lote seleccionado</button></div></div>
+<div id="remote-progress" hidden><p id="remote-progress-label" role="status"></p><progress id="remote-progress-bar" max="100" value="0" style="width:100%"></progress><div id="remote-results" class="remote-list"></div><div class="dialog-actions"><button id="remote-stop" class="btn danger" type="button">Detener tras el chat actual</button><button id="remote-done" class="btn subtle" type="button" hidden>Cerrar informe</button></div></div>
+<p class="hint">Si cambia la interfaz, no carga un chat, o no podemos comprobar su identidad, se detendrá el lote. No hace falta ir uno por uno.</p></div></dialog>
+<dialog id="folder-dialog"><form method="dialog" class="dialog-body"><div class="dialog-head"><h2 id="folder-dialog-title">Nueva carpeta</h2><button class="icon-btn" value="cancel" aria-label="Cerrar">✕</button></div><label class="field">Nombre de la carpeta<input type="text" id="folder-name" maxlength="80" autocomplete="off" placeholder="Escribe para buscar una carpeta existente"></label><div id="folder-suggestions" class="folder-suggestions" role="listbox" aria-label="Lista de carpetas existentes" tabindex="0"></div><p id="folder-choice-hint" class="hint">Si el nombre coincide con una carpeta existente, se reutiliza. Si es nuevo, se crea.</p><div class="dialog-actions"><button class="btn subtle" value="cancel">Cancelar</button><button id="folder-confirm" type="button" class="btn primary">Guardar</button></div></form></dialog>
+<dialog id="folder-delete-dialog"><div class="dialog-body">
+<div class="dialog-head"><h2 id="folder-delete-title">Eliminar carpeta</h2><button id="folder-delete-close" class="icon-btn" aria-label="Cerrar" type="button">✕</button></div>
+<p id="folder-delete-summary"></p><p class="danger-note" id="folder-delete-warning"></p>
+<p class="hint"><strong>Los chats permanecerán en tu cuenta de ChatGPT y en el catálogo local.</strong> Solo se eliminan carpetas y subcarpetas virtuales.</p>
+<label class="toggle"><input type="checkbox" id="folder-delete-ack"> He revisado las subcarpetas y confirmo eliminar esta estructura local.</label>
+<div class="dialog-actions"><button type="button" class="btn subtle" id="folder-delete-cancel">Cancelar</button><button type="button" id="folder-delete-confirm" class="btn danger-solid" disabled>Eliminar carpeta y subcarpetas</button></div>
+</div></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="js/db.js"></script><script src="js/parser.js"></script><script src="js/export.js"></script><script src="js/batch.js"></script><script src="js/live.js"></script>
+<script src="js/folders.js"></script><script src="js/app.js"></script>
+</body></html>
