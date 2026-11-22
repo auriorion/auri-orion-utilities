@@ -1,0 +1,23 @@
+{
+  "schema": "continuity-project/1",
+  "id": "auri-orion-utilities-public",
+  "title": "Auri–Orion · Utilidades públicas",
+  "group": "pendientes",
+  "status": "Publicaciones documentadas",
+  "summary": "Publicaciones documentadas.",
+  "objective": "Distribuir herramientas de Auri–Orion con su código y documentación pública.",
+  "scope": "Cubre extensiones y documentación de instalación, pruebas, licencias y privacidad.",
+  "docs": [
+    {
+      "repo": "auriorion/auri-orion-utilities",
+      "path": "README.md"
+    }
+  ],
+  "tasks": [
+    {
+      "repo": "auriorion/auri-orion-utilities",
+      "path": "README.md",
+      "label": "Documentación y siguientes tareas"
+    }
+  ]
+}
